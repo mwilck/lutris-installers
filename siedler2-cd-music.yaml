@@ -1,0 +1,106 @@
+name:      "Die Siedler II (with CD music)"
+game_slug: "die-siedler-2-music"
+runner:    "dosbox"
+slug:      "die-siedler-2-music-installer"
+version:   "Die Sieder II (copy CD-ROM to hard drive)"
+script:
+  game:
+    main_file: "$GAMEDIR/siedler2.conf"
+  require-binaries: cdrdao, toc2cue, udisksctl
+  installer:
+    # Check for the correct disk
+    # This is also necessary to make lutris realize that the
+    # user has to enter an installation path for $GAMEDIR
+    - insert-disc:
+         requires: s2/root/siedler2.exe
+    # The CD must be unmounted again to make cdrdao work
+    - execute:
+         file: /usr/bin/udisksctl
+         args: unmount -b /dev/cdrom
+    - write_file:
+        file: $GAMEDIR/siedler2.conf
+        content: |
+          [autoexec]
+          mount C $GAMEDIR
+          imgmount D $GAMEDIR/CD/SIEDLER2.cue -t cdrom
+          C:
+          cd \BLUEBYTE\SIEDLER2
+          config -securemode
+          C:\BLUEBYTE\SIEDLER2\SIEDLER2.EXE dt
+          exit
+    - execute:
+        file: /bin/mkdir
+        args: -p $GAMEDIR/CD
+    - execute:
+        # Creating a CUE sheet under Linux
+        # See https://www.dosbox.com/wiki/Cuesheet
+        #     https://github.com/cdrdao/cdrdao
+        file: /usr/bin/cdrdao
+        args: >
+          read-cd --read-raw
+          --device /dev/cdrom
+          --driver generic-mmc:0x20000
+          --datafile "$GAMEDIR/CD/SIEDLER2.bin"
+          $GAMEDIR/CD/SIEDLER2.toc
+        terminal: false
+    - execute:
+        file: /usr/bin/toc2cue
+        args: >
+          $GAMEDIR/CD/SIEDLER2.toc
+          $GAMEDIR/CD/SIEDLER2.cue
+        terminal: false
+    - write_file:
+        file: $GAMEDIR/install.conf
+        content: |
+          [autoexec]
+          mount C $GAMEDIR
+          imgmount D $GAMEDIR/CD/SIEDLER2.cue -t cdrom
+          config -securemode
+    - write_file:
+        file: $GAMEDIR/install.bat
+        content: |
+          d:
+          cd S2
+          SETUP.EXE
+    - task:
+        # It is necessary to use a BAT script from C: as executable.
+        # Without executable, the dosexec task doesn't auto-exit,
+        # regardless of the exit: parameter.
+        # An executable from D: doesn't work at all, because dosbox
+        # implicitly switches to drive C: before running it
+        name: dosexec
+        config_file: $GAMEDIR/install.conf
+        executable: $GAMEDIR/install.bat
+    - write_file:
+        file: $GAMEDIR/BLUEBYTE/SIEDLER2/DRIVERS/DIG.INI
+        content: |
+          ;
+          ;Miles Design Audio Interface Library V3.03 of 7-Nov-95
+          ;
+          
+          DEVICE      Creative Labs Sound Blaster 16 or AWE32
+          DRIVER      SB16.DIG
+          IO_ADDR     220h
+          IRQ         -1
+          DMA_8_BIT   -1
+          DMA_16_BIT  -1
+    - write_file:
+        file: $GAMEDIR/BLUEBYTE/SIEDLER2/DRIVERS/MDI.INI
+        content: |
+          ;
+          ;Miles Design Audio Interface Library V3.03 of 7-Nov-95
+          ;
+          
+          DEVICE      Creative Labs Sound Blaster 16 or AWE32
+          DRIVER      SBPRO2.MDI
+          IO_ADDR     220h
+          IRQ         -1
+          DMA_8_BIT   -1
+          DMA_16_BIT  -1
+    -  execute:
+        file: /bin/rm
+        args: >
+          -f $GAMEDIR/install.bat
+          $GAMEDIR/install.conf
+          $GAMEDIR/CD/SIEDLER2.toc
+        terminal: false
